@@ -13,9 +13,9 @@ https://de.wikipedia.org/wiki/EinStein_w%C3%BCrfelt_nicht
 
 
 Befehle:
-hilfe
-login <name>
-logout
-liste
-werBinIch (lol)
-spiel <gegner>
+- hilfe
+- login <name>
+- logout
+- liste
+- werBinIch (lol)
+- spiel <gegner>
