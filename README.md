@@ -41,3 +41,5 @@ Server Response Codes ( reverse engineered ):
     MoveTimout("E301"),
     IdleTimeout("E302"),
     GameRequestTimeout("E303")
+    
+Server :  vpf.mind-score.de 1078
