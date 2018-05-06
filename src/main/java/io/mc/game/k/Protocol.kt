@@ -10,6 +10,7 @@ sealed class C(val key: String) {
 class ConsoleCommand(val cc: String) : C(cc)
 class Login(val name: String) : C("login $name")
 object Logout : C("logout")
+object Quit: C("quit")
 object PlayerList : C("liste")
 class RequestGame(val opp: String) : C("spiel $opp")
 object WhoAmI : C("werbinich")
@@ -45,7 +46,6 @@ enum class R(val code: String) {
 
 class WrongMove : Exception("Wrong move")
 data class Message(val sender: String, val code: String, val message: String)
-typealias MoveMsg = Triple<Board.Directon, List<Move>, Int>
 
 fun Message.isConnected() = message.contains(connectMarker)
 fun Message.isLoggedIn() = message.contains(loggedInMarker)
@@ -59,8 +59,13 @@ else message.substringAfter(listeMarker).split(" ").filterNot { it.isEmpty() }
 fun Message.isStart() = message.contains(gameStart)
 fun Message.parseMoves() = if (message == "E01") throw WrongMove() else
     message.split(" ").filterNot { it.isEmpty() }.map { Move(it) }
+
+fun Message.isMove() = code == "Z" && !isDice() && !infoZugAn() && !setStart()
+fun Message.infoZugAn() = message.contains(zugInfoMarker)
+fun Message.setStart() = message.contains(setStartMarker)
 fun Message.isDice() = message.startsWith(diceMarker)
 fun Message.parseDice() = message.substringAfter(diceMarker).toInt()
+fun Message.isEnd() = message.contains(endMarker)
 
 val connectMarker = "Verbindung zum Server erstellt"
 val loggedInMarker = "Sie sind angemeldet"
@@ -70,18 +75,17 @@ val nobodyFree = "Niemand frei!"
 val requestMarker = "Hole Einverstaendnis von"
 val gameStart = "Spiel startet."
 val diceMarker = "Würfel: "
+val zugInfoMarker = "Zug an"
+val setStartMarker = "Sie sind am Zug"
+val endMarker = "Spielende"
 
 fun String.parseMessage(): Message {
     val z = contains("Z>") // TODO
-    val w = contains(diceMarker) && !contains("(")
-    return split(" ").let {
+    return split(" ").let { p ->
         if (z)
-            if (w)
-                Message(it[0], it[1].dropLast(1), drop(indexOf(">") + 2))
-            else
-                Message(it[0], it[3].dropLast(1), drop(indexOf(">") + 2))
+            Message(p[0], "Z", drop(indexOf(">") + 2))
         else
-            Message(it[0], it[1].dropLast(1), drop(indexOf(">") + 2))
+            Message(p[0], p[1].dropLast(1), drop(indexOf(">") + 2))
     }
 }
 
@@ -90,5 +94,10 @@ fun String.parseResponseCode(): R {
         R.values().firstOrNull { it.code == c.code } ?: R.ParseError
     }
 
+}
+
+
+fun main(args: Array<String>) {
+    println("m5 (Würfel: 1) Z> 311 512 113 221 422 631".parseMessage().isDice())
 }
 

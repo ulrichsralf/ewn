@@ -37,46 +37,44 @@ class GameContext(val pos: ByteArray,
 }
 
 enum class GameState {
-    INIT, STARTED, FINISHED, ERROR
+    NEW, INIT_OPP, INIT_OWN, STARTED, FINISHED, ERROR
 }
 
-class Game(var state: GameState = GameState.INIT) {
+class Game(var state: GameState = GameState.NEW) {
     var board: Board? = null
     var dir: Board.Directon? = null
+    var own: List<Move>? = null
 
-    fun setOwnStart(my: List<Move>, opp: List<Move>) {
-        checkError {
-            dir = if (my.first().isAtTop()) OWN else OPP
-            board = Board(my = my.toByteArray(), opp = opp.toByteArray())
-            state = GameState.STARTED
-        }
+    fun setOwnStart(my: List<Move>) {
+
+        dir = if (my.first().isAtTop()) OWN else OPP
+        own = my
+        state = GameState.INIT_OWN
+
     }
 
+    fun isFinished() = board?.isFinished(dir!!) ?: false
+
     fun getOwnPos() = board?.my?.toMoveList().orEmpty()
+
     fun setOppStart(ms: List<Move>) {
-        checkError {
-            dir = if (ms.first().isAtTop()) OWN else OPP
-            board = Board(opp = ms.toByteArray(), my = generateStartPosition(!ms.first().isAtTop()))
-            state = GameState.STARTED
-        }
+
+        dir = if (ms.first().isAtTop()) OWN else OPP
+        board = Board(opp = ms.toByteArray(), my = own?.toByteArray()
+                ?: generateStartPosition(!ms.first().isAtTop()))
+        state = GameState.INIT_OPP
+
     }
 
     fun getAllowedMoves(w: Int) = board!!.getAllowedMoves(w, dir!!)
     fun move(m: Move) {
-        checkError { board?.move(m, dir!!) }
+         board?.move(m, dir!!)
     }
 
     fun moveOpp(m: Move) {
-        checkError { board?.move(m, dir!!.other()) }
+         board?.move(m, dir!!.other())
     }
 
-    private fun checkError(b: () -> Unit) {
-        try {
-            b()
-        } catch (e: Exception) {
-            state = GameState.ERROR
-        }
-    }
 }
 
 
@@ -86,18 +84,10 @@ fun main(args: Array<String>) {
 
 
     val g = Game()
-    g.setOwnStart(generateStartPosition(true).toMoveList(),
-            generateStartPosition(false).toMoveList())
-
+    g.setOwnStart(generateStartPosition(true).toMoveList())
+    g.setOppStart(generateStartPosition(false).toMoveList())
     println(g.board)
-    val g2 = Game()
-    g2.setOppStart(generateStartPosition(true).toMoveList())
-    println(g2.board)
-    val g3 = Game()
-    g3.setOppStart(generateStartPosition(false).toMoveList())
-    println(g3.board)
-    g3.move(g3.getAllowedMoves(3).first())
-    println(g3.board)
+    println(g.getAllowedMoves(3))
 
 
 }

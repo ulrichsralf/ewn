@@ -47,6 +47,13 @@ class Board(val my: ByteArray = generateStartPosition(true),
         }
     }
 
+    fun isFinished(dir: Directon): Boolean {
+        return if (dir == OPP)
+            area[4][4].toToken().own || opp.none { it != Byte.MAX_VALUE }
+        else
+            area[0][0].toToken().own || opp.none { it != Byte.MAX_VALUE }
+    }
+
     fun move(move: Move, dir: Directon): Int {
         val result = MoveResult(own = my.toMoveList(), opp = opp.toMoveList())
         contextDirection(dir, result) {
@@ -80,7 +87,7 @@ class Board(val my: ByteArray = generateStartPosition(true),
             result.addAll(setOf(l, r).filterNotNull()
                     .map { it.getNumbers() }
                     .map { n ->
-                        val op = if (dir == OWN)
+                        val op = if (dir == OPP)
                             { a: Int -> if (a < 5) a + 1 else a }
                         else
                             { a: Int -> if (a > 1) a - 1 else a }

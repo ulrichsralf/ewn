@@ -12,7 +12,7 @@ fun Byte.byteToMove() = (toInt() and 0xff).toString(6)
 
 fun Token.toByte() = (key + (if (own) 10 else 20)).toByte()
 fun Byte.toToken() = toInt().let { Token(it % 10, it < 20) }
-fun Token.isFree() = key == 7
+
 
 fun ByteArray.toMoveList(): List<Move> {
     return filterNot { it.isFree() }

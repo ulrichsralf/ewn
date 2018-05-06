@@ -1,6 +1,9 @@
 package io.mc.game.k
 
+import io.mc.game.k.util.generateStartPosition
+import io.mc.game.k.util.getNumbers
 import io.mc.game.k.util.robust
+import io.mc.game.k.util.toMoveList
 import kotlinx.coroutines.experimental.channels.ReceiveChannel
 import kotlinx.coroutines.experimental.channels.SendChannel
 import kotlinx.coroutines.experimental.channels.actor
@@ -17,7 +20,7 @@ fun main(args: Array<String>) = runBlocking {
     var g = Game()
 
 
-    connect("localhost").let { (netOut, netIn) ->
+    connect("vpf.mind-score.de").let { (netOut, netIn) ->
         Runtime.getRuntime().addShutdownHook(Thread {
             launch { netOut.send(Logout) }
             Thread.sleep(200)
@@ -43,32 +46,60 @@ fun main(args: Array<String>) = runBlocking {
                         }
                         R.Message -> when {
                             it.isStart() -> g = Game()
+                            it.isEnd() -> {
+                                println("Endstand: ")
+                                println(g.board)
+                                g.state = GameState.FINISHED
+                            }
                             else -> Unit
                         }
                         R.Move -> when {
                             it.isDice() -> {
-                                val d = it.parseDice()
-                                val am = g.getAllowedMoves(d)
-                                g.move(am.first())
-                                netOut.send(MoveC(am.take(1)))
+                                when (g.state) {
+                                    GameState.INIT_OPP -> {
+                                        netOut.send(MoveC(g.getOwnPos()))
+                                        g.state = GameState.STARTED
+                                    }
+                                    GameState.STARTED -> {
+                                        val all = g.getAllowedMoves(it.parseDice())
+                                        println("Zug ${it.parseDice()} : Züge: $all")
+                                        val m = all.sortedBy {it.getNumbers().let { it[1] + it[2] }}.first()
+                                        println(m)
+                                        g.move(m)
+                                        Thread.sleep(3000)
+                                        netOut.send(MoveC(listOf(m)))
+                                        println(g.board)
+                                    }
+                                    else -> Unit
+                                }
+                            }
+                            it.isMove() -> {
+                                if (g.state != GameState.STARTED) {
+                                    robust { g.setOppStart(it.parseMoves()) }
+                                } else {
+                                    robust { g.moveOpp(it.parseMoves().first()) }
+                                    println(g.board)
+                                }
+                            }
+                            it.setStart() -> {
+                                val start = generateStartPosition(true).toMoveList()
+                                g.setOwnStart(start)
+                                netOut.send(MoveC(start))
                             }
                             else -> {
-                                robust { it.parseMoves() }?.let {
-                                    if (g.state == GameState.INIT) {
-                                        g.setOppStart(it)
-                                        netOut.send(MoveC(g.getOwnPos()))
-                                    } else {
-                                        g.moveOpp(it.first())
-                                    }
 
-                                }
                             }
                         }
                         else -> Unit
                     }
                 }
-
                 println(msg)
+                if(g.state == GameState.STARTED && g.isFinished()){
+                    println("Won Game")
+                    println(g.board)
+                    g.state = GameState.FINISHED
+                    netOut.send(Quit)
+                }
             }
         }
         cl.join()
