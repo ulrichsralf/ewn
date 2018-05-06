@@ -48,10 +48,8 @@ class Board(val my: ByteArray = generateStartPosition(true),
     }
 
     fun isFinished(dir: Directon): Boolean {
-        return if (dir == OPP)
-            area[4][4].toToken().own || opp.none { it != Byte.MAX_VALUE }
-        else
-            area[0][0].toToken().own || opp.none { it != Byte.MAX_VALUE }
+        return (if (dir == OWN) area[0][0] else area[4][4]).toToken().own
+                || opp.none { it != Byte.MAX_VALUE }
     }
 
     fun move(move: Move, dir: Directon): Int {
