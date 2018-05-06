@@ -68,11 +68,11 @@ class Game(var state: GameState = GameState.NEW) {
 
     fun getAllowedMoves(w: Int) = board!!.getAllowedMoves(w, dir!!)
     fun move(m: Move) {
-         board?.move(m, dir!!)
+        board?.move(m, dir!!)
     }
 
     fun moveOpp(m: Move) {
-         board?.move(m, dir!!.other())
+        board?.move(m, dir!!.other())
     }
 
 }
@@ -84,11 +84,18 @@ fun main(args: Array<String>) {
 
 
     val g = Game()
-    g.setOwnStart(generateStartPosition(true).toMoveList())
-    g.setOppStart(generateStartPosition(false).toMoveList())
+   // g.setOwnStart(generateStartPosition(true).toMoveList())
+    g.setOppStart(generateStartPosition(true).toMoveList())
     println(g.board)
     println(g.getAllowedMoves(3))
-
+    g.move(g.getAllowedMoves(3).first())
+    println(g.board)
+    g.move(g.getAllowedMoves(3).first())
+    println(g.board)
+    g.move(g.getAllowedMoves(3).first())
+    println(g.board)
+    g.move(g.getAllowedMoves(3).first())
+    println(g.board)
 
 }
 

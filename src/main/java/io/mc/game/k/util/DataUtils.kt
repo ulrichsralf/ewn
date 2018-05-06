@@ -29,7 +29,7 @@ fun List<Move>.toByteArray(): ByteArray {
 }
 fun List<String>.toMoveArray() = map { Move(it) }.toByteArray()
 
-fun Move.isAtTop() = getNumbers().takeLast(2).fold(0, { a, b -> a + b }) < 6
+fun Move.isAtTop() = getNumbers().let { it[1] + it[2] } < 6
 fun Byte.isFree() = this == Byte.MAX_VALUE
 
 fun Move.isAt(pos: Byte): Pair<Boolean, Boolean> {
