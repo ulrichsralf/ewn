@@ -1,7 +1,7 @@
 package io.mc.game.k
 
-import io.mc.game.k.Board.Directon.OPP
-import io.mc.game.k.Board.Directon.OWN
+import io.mc.game.k.Board.Directon.UP
+import io.mc.game.k.Board.Directon.DOWN
 import io.mc.game.k.util.*
 
 
@@ -26,7 +26,7 @@ data class MoveResult(var captureOwn: Move? = null,
                       var own: List<Move> = listOf(),
                       var opp: List<Move> = listOf()) {
     fun setMoves(pos: ByteArray, dir: Board.Directon) {
-        if (dir == OWN) own = pos.toMoveList()
+        if (dir == DOWN) own = pos.toMoveList()
         else opp = pos.toMoveList()
     }
 }
@@ -37,34 +37,30 @@ class GameContext(val pos: ByteArray,
 }
 
 enum class GameState {
-    NEW, INIT_OPP, INIT_OWN, STARTED, FINISHED, ERROR
+    CLEAN, RUNNING, FINISHED, ERROR
 }
 
-class Game(var state: GameState = GameState.NEW) {
+
+class Game(var state: GameState = GameState.CLEAN) {
     var board: Board? = null
     var dir: Board.Directon? = null
-    var own: List<Move>? = null
 
-    fun setOwnStart(my: List<Move>) {
+    fun reset() {
+        board = null
+        dir = null
+        state = GameState.CLEAN
+    }
 
-        dir = if (my.first().isAtTop()) OWN else OPP
-        own = my
-        state = GameState.INIT_OWN
-
+    fun setStartPos(my: List<Move>, opp: List<Move>) {
+        dir = my.getDirection()
+        board = Board(my = my.toByteArray(), opp = opp.toByteArray())
+        state = GameState.RUNNING
     }
 
     fun isFinished() = board?.isFinished(dir!!) ?: false
 
     fun getOwnPos() = board?.my?.toMoveList().orEmpty()
 
-    fun setOppStart(ms: List<Move>) {
-
-        dir = if (ms.first().isAtTop()) OWN else OPP
-        board = Board(opp = ms.toByteArray(), my = own?.toByteArray()
-                ?: generateStartPosition(!ms.first().isAtTop()))
-        state = GameState.INIT_OPP
-
-    }
 
     fun getAllowedMoves(w: Int) = board!!.getAllowedMoves(w, dir!!)
     fun move(m: Move) {
@@ -84,8 +80,7 @@ fun main(args: Array<String>) {
 
 
     val g = Game()
-   // g.setOwnStart(generateStartPosition(true).toMoveList())
-    g.setOppStart(generateStartPosition(true).toMoveList())
+    // g.setOwnStart(generateStartPosition(true).toMoveList())
     println(g.board)
     println(g.getAllowedMoves(3))
     g.move(g.getAllowedMoves(3).first())

@@ -1,54 +1,31 @@
 package io.mc.game.k
 
-import io.mc.game.k.Board.Directon.*
+import io.mc.game.k.Board.Directon.DOWN
+import io.mc.game.k.Board.Directon.UP
 import io.mc.game.k.util.*
 
-class Board(val my: ByteArray = generateStartPosition(true),
-            val opp: ByteArray = generateStartPosition(false)) {
+class Board(val my: List<Move> = generateStartPosition(true),
+            val opp: List<Move> = generateStartPosition(false)) {
 
-    val area: List<ByteArray> = (0 until 5).map { ByteArray(5, { Byte.MAX_VALUE }) }
+    val area: List<List<Char>> = (0 until 5).map { (0 until 5).map {'.'} }
 
-    enum class Directon { OWN, OPP, BOTH }
+    enum class Directon { DOWN, UP }
 
-    fun clone() = Board(my.clone(), opp.clone())
-
-    private fun contextDirection(dir: Directon, result: MoveResult = MoveResult(), context: GameContext.() -> Unit) {
-        fun getContext(pos: ByteArray, d: Directon): GameContext {
-            return GameContext(pos, area, d, result)
-        }
-
-        fun withContext(gc: GameContext) {
-            context(gc)
-            gc.result.setMoves(gc.pos, gc.dir)
-        }
-
-        val con = getContext(my, OWN)
-        val rev = getContext(opp, OPP)
-        when (dir) {
-            OWN -> withContext(con)
-            OPP -> withContext(rev)
-            BOTH -> {
-                withContext(con)
-                withContext(rev)
-            }
-        }
-    }
 
     init {
-        contextDirection(BOTH) {
+        val ownDir = my.toMoveList().getDirection()
             pos.toMoveList()
                     .forEach { p ->
                         p.getNumbers()
                                 .let { (k, x, y) ->
                                     area[y - 1][x - 1] =
-                                            Token(k, dir == OWN).toByte()
+                                            Token(k, dir == ownDir).toByte()
                                 }
                     }
-        }
     }
 
     fun isFinished(dir: Directon): Boolean {
-        return (if (dir == OWN) area[0][0] else area[4][4]).toToken().own
+        return (if (dir == DOWN) area[0][0] else area[4][4]).toToken().own
                 || opp.none { it != Byte.MAX_VALUE }
     }
 
@@ -59,7 +36,7 @@ class Board(val my: ByteArray = generateStartPosition(true),
             area[y - 1][x - 1] = Byte.MAX_VALUE
             val (nk, nx, ny) = move.getNumbers()
             val targetLoc = area[ny - 1][nx - 1]
-            area[ny - 1][nx - 1] = Token(nk, dir == OWN).toByte()
+            area[ny - 1][nx - 1] = Token(nk, dir == DOWN).toByte()
             pos.apply { set(nk - 1, move.code) }
             if (!targetLoc.isFree()) {
                 targetLoc.toToken().let { t ->
@@ -67,7 +44,7 @@ class Board(val my: ByteArray = generateStartPosition(true),
                         if (t.own) result.captureOwn = it
                         else result.captureOpp = it
                     }
-                    contextDirection(if (t.own) OWN else OPP, result) {
+                    contextDirection(if (t.own) DOWN else UP, result) {
                         pos.apply { set(t.key - 1, Byte.MAX_VALUE) }
                     }
                 }
@@ -85,7 +62,7 @@ class Board(val my: ByteArray = generateStartPosition(true),
             result.addAll(setOf(l, r).filterNotNull()
                     .map { it.getNumbers() }
                     .map { n ->
-                        val op = if (dir == OPP)
+                        val op = if (dir == UP)
                             { a: Int -> if (a < 5) a + 1 else a }
                         else
                             { a: Int -> if (a > 1) a - 1 else a }

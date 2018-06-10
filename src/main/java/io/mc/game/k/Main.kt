@@ -16,11 +16,14 @@ import java.net.Socket
 import java.util.*
 
 
-fun main(args: Array<String>) = runBlocking {
-    var g = Game()
+fun main(args: Array<String>) {
+    runGame()
+}
 
 
-    connect("vpf.mind-score.de").let { (netOut, netIn) ->
+fun runGame(name : String = "ralf") = runBlocking {
+    val g = Game()
+    connect("localhost").let { (netOut, netIn) ->
         Runtime.getRuntime().addShutdownHook(Thread {
             launch { netOut.send(Logout) }
             Thread.sleep(200)
@@ -37,7 +40,7 @@ fun main(args: Array<String>) = runBlocking {
                     println(it)
                     when (msg.parseResponseCode()) {
                         R.Success -> when {
-                            it.isConnected() -> netOut.send(Login("ralf"))
+                            it.isConnected() -> netOut.send(Login(name))
                             it.isLoggedIn() -> netOut.send(PlayerList)
                             it.isListe() -> {
                                 println(it.getPlayerListe())
@@ -45,7 +48,7 @@ fun main(args: Array<String>) = runBlocking {
                             else -> Unit
                         }
                         R.Message -> when {
-                            it.isStart() -> g = Game()
+                            it.isStart() -> g.reset()
                             it.isEnd() -> {
                                 println("Endstand: ")
                                 println(g.board)
@@ -56,14 +59,14 @@ fun main(args: Array<String>) = runBlocking {
                         R.Move -> when {
                             it.isDice() -> {
                                 when (g.state) {
-                                    GameState.INIT_OPP -> {
-                                        netOut.send(MoveC(g.getOwnPos()))
-                                        g.state = GameState.STARTED
-                                    }
-                                    GameState.STARTED -> {
+//                                    GameState.OPP_READY -> {
+//                                        netOut.send(MoveC(g.getOwnPos()))
+//                                        g.state = GameState.RUNNING
+//                                    }
+                                    GameState.RUNNING -> {
                                         val all = g.getAllowedMoves(it.parseDice())
                                         println("Zug ${it.parseDice()} : Züge: $all")
-                                        val m = all.sortedBy {it.getNumbers().let { it[1] + it[2] }}.first()
+                                        val m = all.sortedBy { it.getNumbers().let { it[1] + it[2] } }.first()
                                         println(m)
                                         g.move(m)
                                         Thread.sleep(3000)
@@ -74,8 +77,8 @@ fun main(args: Array<String>) = runBlocking {
                                 }
                             }
                             it.isMove() -> {
-                                if (g.state != GameState.STARTED) {
-                                    robust { g.setOppStart(it.parseMoves()) }
+                                if (g.state != GameState.RUNNING) {
+                                  //  robust { g.setOppStart(it.parseMoves()) }
                                 } else {
                                     robust { g.moveOpp(it.parseMoves().first()) }
                                     println(g.board)
@@ -83,7 +86,7 @@ fun main(args: Array<String>) = runBlocking {
                             }
                             it.setStart() -> {
                                 val start = generateStartPosition(true).toMoveList()
-                                g.setOwnStart(start)
+                           //     g.setOwnStart(start)
                                 netOut.send(MoveC(start))
                             }
                             else -> {
@@ -94,7 +97,7 @@ fun main(args: Array<String>) = runBlocking {
                     }
                 }
                 println(msg)
-                if(g.state == GameState.STARTED && g.isFinished()){
+                if (g.state == GameState.RUNNING && g.isFinished()) {
                     println("Won Game")
                     println(g.board)
                     g.state = GameState.FINISHED

@@ -31,6 +31,7 @@ fun List<String>.toMoveArray() = map { Move(it) }.toByteArray()
 
 fun Move.isAtTop() = getNumbers().let { it[1] + it[2] } < 6
 fun Byte.isFree() = this == Byte.MAX_VALUE
+fun List<Move>.getDirection() = if (first().isAtTop()) DOWN else UP
 
 fun Move.isAt(pos: Byte): Pair<Boolean, Boolean> {
     val a = code.byteToMove()
@@ -41,7 +42,7 @@ fun Move.isAt(pos: Byte): Pair<Boolean, Boolean> {
 fun Move.getNumbers() = toString().map { it.toString().toInt() }
 fun Move.getKey() = getNumbers().first()
 
-fun Board.Directon.other() = if (this == OPP) OWN else OPP
+fun Board.Directon.other() = if (this == UP) DOWN else UP
 
 fun <T> robust(body: () -> T): T? {
     try {
@@ -71,7 +72,7 @@ fun Board.printMoves(key: Int, directon: Board.Directon) {
         move.getNumbers()
                 .let { (_, x, y) -> Move(i + 1, x, y) }
     }.toByteArray()
-    val b = if (directon == Board.Directon.OWN)
+    val b = if (directon == Board.Directon.DOWN)
         Board(moves, ByteArray(0))
     else
         Board(ByteArray(0), moves)
