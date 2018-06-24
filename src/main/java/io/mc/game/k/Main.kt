@@ -1,9 +1,6 @@
 package io.mc.game.k
 
 import io.mc.game.k.util.generateStartPosition
-import io.mc.game.k.util.getNumbers
-import io.mc.game.k.util.robust
-import io.mc.game.k.util.toMoveList
 import kotlinx.coroutines.experimental.channels.ReceiveChannel
 import kotlinx.coroutines.experimental.channels.SendChannel
 import kotlinx.coroutines.experimental.channels.actor
@@ -21,7 +18,7 @@ fun main(args: Array<String>) {
 }
 
 
-fun runGame(name : String = "ralf") = runBlocking {
+fun runGame(name: String = "ralf") = runBlocking {
     val g = Game()
     connect("localhost").let { (netOut, netIn) ->
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -52,21 +49,19 @@ fun runGame(name : String = "ralf") = runBlocking {
                             it.isEnd() -> {
                                 println("Endstand: ")
                                 println(g.board)
-                                g.state = GameState.FINISHED
                             }
                             else -> Unit
                         }
                         R.Move -> when {
                             it.isDice() -> {
                                 when (g.state) {
-//                                    GameState.OPP_READY -> {
-//                                        netOut.send(MoveC(g.getOwnPos()))
-//                                        g.state = GameState.RUNNING
-//                                    }
+                                    GameState.READY -> {
+                                        g.setOwnStart(generateStartPosition(false))
+                                       netOut.send(MoveC(g.me!!))
+                                        g.state = GameState.RUNNING
+                                    }
                                     GameState.RUNNING -> {
-                                        val all = g.getAllowedMoves(it.parseDice())
-                                        println("Zug ${it.parseDice()} : Züge: $all")
-                                        val m = all.sortedBy { it.getNumbers().let { it[1] + it[2] } }.first()
+                                        val m = g.getBestMove(it.parseDice())
                                         println(m)
                                         g.move(m)
                                         Thread.sleep(3000)
@@ -78,15 +73,16 @@ fun runGame(name : String = "ralf") = runBlocking {
                             }
                             it.isMove() -> {
                                 if (g.state != GameState.RUNNING) {
-                                  //  robust { g.setOppStart(it.parseMoves()) }
+                                    g.setOppStart(it.parseMoves())
                                 } else {
-                                    robust { g.moveOpp(it.parseMoves().first()) }
-                                    println(g.board)
+                                    g.moveOpp(it.parseMoves().first())
                                 }
+                                println(g.board)
                             }
+
                             it.setStart() -> {
-                                val start = generateStartPosition(true).toMoveList()
-                           //     g.setOwnStart(start)
+                                val start = generateStartPosition(true)
+                                g.setOwnStart(start)
                                 netOut.send(MoveC(start))
                             }
                             else -> {

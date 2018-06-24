@@ -10,7 +10,7 @@ sealed class C(val key: String) {
 class ConsoleCommand(val cc: String) : C(cc)
 class Login(val name: String) : C("login $name")
 object Logout : C("logout")
-object Quit: C("quit")
+object Quit : C("quit")
 object PlayerList : C("liste")
 class RequestGame(val opp: String) : C("spiel $opp")
 object WhoAmI : C("werbinich")

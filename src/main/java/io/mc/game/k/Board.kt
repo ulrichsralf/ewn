@@ -2,84 +2,103 @@ package io.mc.game.k
 
 import io.mc.game.k.Board.Directon.DOWN
 import io.mc.game.k.Board.Directon.UP
-import io.mc.game.k.util.*
+import io.mc.game.k.util.generateStartPosition
+import io.mc.game.k.util.getDirection
+import io.mc.game.k.util.getString
 
-class Board(val my: List<Move> = generateStartPosition(true),
-            val opp: List<Move> = generateStartPosition(false)) {
+class Board(me: List<Move> = generateStartPosition(true),
+            you: List<Move> = generateStartPosition(false),
+            val dir: Directon = me.getDirection()) {
 
-    val area: List<List<Char>> = (0 until 5).map { (0 until 5).map {'.'} }
 
+    data class Token(val player: Player = Player.NONE, val w: Int = 0)
+
+    enum class Player { ME, YOU, NONE }
     enum class Directon { DOWN, UP }
+
+    val area: BoardArea = Array(6, { Array(6, { Token() }) })
+    private val upMoveFun = { a: Int -> if (a > 2) a - 1 else a }
+    private val downMoveFun = { a: Int -> if (a < 6) a + 1 else a }
+    private val moveFunMap = mutableMapOf<Player, MoveFun>()
 
 
     init {
-        val ownDir = my.toMoveList().getDirection()
-            pos.toMoveList()
-                    .forEach { p ->
-                        p.getNumbers()
-                                .let { (k, x, y) ->
-                                    area[y - 1][x - 1] =
-                                            Token(k, dir == ownDir).toByte()
-                                }
-                    }
+        me.forEach { area[it.x][it.y] = Token(Player.ME, it.w) }
+        you.forEach { area[it.x][it.y] = Token(Player.YOU, it.w) }
+        moveFunMap[Player.ME] = if (dir == DOWN) downMoveFun else upMoveFun
+        moveFunMap[Player.YOU] = if (dir == UP) downMoveFun else upMoveFun
     }
 
-    fun isFinished(dir: Directon): Boolean {
-        return (if (dir == DOWN) area[0][0] else area[4][4]).toToken().own
-                || opp.none { it != Byte.MAX_VALUE }
+
+    fun move(move: Move, player: Player): Board {
+        moveToken(move, Token(player, move.w))
+        return this
     }
 
-    fun move(move: Move, dir: Directon): Int {
-        val result = MoveResult(own = my.toMoveList(), opp = opp.toMoveList())
-        contextDirection(dir, result) {
-            val (_, x, y) = pos.getOldPositionByKey(move)
-            area[y - 1][x - 1] = Byte.MAX_VALUE
-            val (nk, nx, ny) = move.getNumbers()
-            val targetLoc = area[ny - 1][nx - 1]
-            area[ny - 1][nx - 1] = Token(nk, dir == DOWN).toByte()
-            pos.apply { set(nk - 1, move.code) }
-            if (!targetLoc.isFree()) {
-                targetLoc.toToken().let { t ->
-                    Move("${t.key}$nx$ny").let {
-                        if (t.own) result.captureOwn = it
-                        else result.captureOpp = it
-                    }
-                    contextDirection(if (t.own) DOWN else UP, result) {
-                        pos.apply { set(t.key - 1, Byte.MAX_VALUE) }
-                    }
-                }
+    fun calcScore(move: Move, player: Player): Int {
+        val b = this.clone()
+        val token = b.moveToken(move, Token(player, move.w))
+        val capture = token.player != Player.NONE
+        val own = token.player == player
+        //val playerCount =  getMoves(player).count()
+        //val otherCount = getMoves(player.other()).count()
+        val captureF = if (capture) 2 else 1
+        //val ownF = if (own) 1 else 2
+        return 100 * captureF //* ownF
+    }
+
+    private fun getMoves(player: Player): List<Move> {
+        return (1..6).mapNotNull { area.search(Token(player, it)) }
+    }
+
+    fun clone(): Board {
+        return Board(getMoves(Player.ME), getMoves(Player.YOU), dir)
+    }
+
+    private fun <Token> Array<Array<Token>>.search(token: Board.Token): Move? {
+        for (x in 1..5) {
+            for (y in 1..5) {
+                if (this[x][y] == token) return Move(token.w, x, y)
             }
         }
-        return calcMoveScore(result)
+        return null
     }
 
-    fun getAllowedMoves(w: Int, dir: Directon): Set<Move> {
-        val result = hashSetOf<Move>()
-        contextDirection(dir) {
-            val i = w - 1
-            val l = (i downTo 0).firstOrNull { !pos[it].isFree() }?.let { Move(pos[it]) }
-            val r = (i..5).firstOrNull { !pos[it].isFree() }?.let { Move(pos[it]) }
-            result.addAll(setOf(l, r).filterNotNull()
-                    .map { it.getNumbers() }
-                    .map { n ->
-                        val op = if (dir == UP)
-                            { a: Int -> if (a < 5) a + 1 else a }
-                        else
-                            { a: Int -> if (a > 1) a - 1 else a }
-                        setOf(Move(n[0], op(n[1]), n[2]),
-                                Move(n[0], n[1], op(n[2])),
-                                Move(n[0], op(n[1]), op(n[2])))
-                                .let { it - Move(n[0], n[1], n[2]) }
-                    }.flatten())
+    private fun moveToken(move: Move, token: Token): Token {
+        val oldPos = area.search(token) ?: let {
+            println(this)
+            throw IllegalStateException("Token $token not found, $area")
         }
+        area[oldPos.x][oldPos.y] = Token()
+        val oldToken = area[move.x][move.y]
+        area[move.x][move.y] = token
+        return oldToken
+    }
+
+    fun getAllowedMoves(token: Board.Token): Set<Move> {
+        val result = hashSetOf<Move>()
+        val moveFun = moveFunMap[token.player]!!
+        val l = (token.w downTo 1).mapNotNull { area.search(token) }.firstOrNull()
+        val r = (token.w..6).mapNotNull { area.search(token) }.firstOrNull()
+        result.addAll(setOf(l, r).filterNotNull()
+                .map {
+                    setOf(Move(it.w, moveFun(it.x), it.y),
+                            Move(it.w, it.x, moveFun(it.y)),
+                            Move(it.w, moveFun(it.x), moveFun(it.y))) - it
+                }.flatten())
         return result
     }
 
-    private fun calcMoveScore(result: MoveResult): Int {
-        return 1
-    }
 
     override fun toString(): String {
-        return print()
+        return getString()
     }
 }
+
+
+data class Move(val w: Int, val x: Int, val y: Int) {
+    constructor(move: String) : this(move.substring(0, 1).toInt(), move.substring(1, 2).toInt(), move.substring(2, 3).toInt())
+}
+
+typealias MoveFun = (Int) -> Int
+typealias BoardArea = Array<Array<Board.Token>>
