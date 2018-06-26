@@ -76,18 +76,12 @@ fun runGame(name: String = "ralf") = runBlocking {
                                     else -> Unit
                                 }
                             }
-                            it.isMove() -> {
-                                fsm.fire(FSMEvent.DICE, mapOf("key" to "peter"))
-                                if (g.state != GameState.RUNNING) {
-                                    g.setOppStart(it.parseMoves())
-                                } else {
-                                    g.moveOpp(it.parseMoves().first())
-                                }
-                                println(g.board)
-                            }
+                            it.isMove() ->  fsm.fire(FSMEvent.DICE, mapOf("move" to it.parseMoves()))
+
 
                             it.setStart() -> {
                                 val start = generateStartPosition(true)
+                                fsm.fire(FSMEvent.SET_ME_TOKEN, mapOf("set" to start))
                                 g.setOwnStart(start)
                                 netOut.send(MoveC(start))
                             }
