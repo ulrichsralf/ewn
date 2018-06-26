@@ -38,7 +38,10 @@ fun runGame(name: String = "ralf") = runBlocking {
                     when (msg.parseResponseCode()) {
                         R.Success -> when {
                             it.isConnected() -> netOut.send(Login(name))
-                            it.isLoggedIn() -> netOut.send(PlayerList)
+                            it.isLoggedIn() ->{
+                                netOut.send(PlayerList)
+                                fsm.fire(FSMEvent.LOGIN, mapOf("name" to name))
+                            }
                             it.isListe() -> {
                                 println(it.getPlayerListe())
                             }
@@ -47,6 +50,7 @@ fun runGame(name: String = "ralf") = runBlocking {
                         R.Message -> when {
                             it.isStart() -> g.reset()
                             it.isEnd() -> {
+                                fsm.fire(FSMEvent.FINISH, mapOf("key" to "peter"))
                                 println("Endstand: ")
                                 println(g.board)
                             }
@@ -54,6 +58,7 @@ fun runGame(name: String = "ralf") = runBlocking {
                         }
                         R.Move -> when {
                             it.isDice() -> {
+                                fsm.fire(FSMEvent.DICE, mapOf("dice" to it.parseDice()))
                                 when (g.state) {
                                     GameState.READY -> {
                                         g.setOwnStart(generateStartPosition(false))
@@ -72,6 +77,7 @@ fun runGame(name: String = "ralf") = runBlocking {
                                 }
                             }
                             it.isMove() -> {
+                                fsm.fire(FSMEvent.DICE, mapOf("key" to "peter"))
                                 if (g.state != GameState.RUNNING) {
                                     g.setOppStart(it.parseMoves())
                                 } else {
@@ -85,9 +91,7 @@ fun runGame(name: String = "ralf") = runBlocking {
                                 g.setOwnStart(start)
                                 netOut.send(MoveC(start))
                             }
-                            else -> {
-
-                            }
+                            else -> Unit
                         }
                         else -> Unit
                     }
