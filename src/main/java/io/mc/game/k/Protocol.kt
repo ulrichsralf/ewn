@@ -47,6 +47,8 @@ enum class R(val code: String) {
 class WrongMove : Exception("Wrong move")
 data class Message(val sender: String, val code: String, val message: String)
 
+fun Message.isAccepted() = message.contains(acceptMarker)
+fun Message.isRequested() = message.contains(requestMarker)
 fun Message.isConnected() = message.contains(connectMarker)
 fun Message.isLoggedIn() = message.contains(loggedInMarker)
 fun Message.isListe() = message.contains(listeMarker)
@@ -55,6 +57,7 @@ fun Message.isEmptyListe() = message.contains(listeMarker) &&
 
 fun Message.getPlayerListe() = if (isEmptyListe()) emptyList()
 else message.substringAfter(listeMarker).split(" ").filterNot { it.isEmpty() }
+
 
 fun Message.isStart() = message.contains(gameStart)
 fun Message.parseMoves() = if (message == "E01") throw WrongMove() else
@@ -78,6 +81,7 @@ val diceMarker = "Würfel: "
 val zugInfoMarker = "Zug an"
 val setStartMarker = "Sie sind am Zug"
 val endMarker = "Spielende"
+val acceptMarker = "akzeptiert"
 
 fun String.parseMessage(): Message {
     val z = contains("Z>") // TODO

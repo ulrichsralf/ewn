@@ -27,7 +27,7 @@ class Game(var board: Board? = Board(), var state: GameState = GameState.READY) 
     fun getAllowedMoves(dice: Int) = board?.getAllowedMoves(Board.Token(Board.Player.ME,dice)).orEmpty()
 
     fun getBestMove(dice: Int) = getAllowedMoves(dice).map { it to  board?.calcScore(it,Board.Player.ME) }
-            .sortedBy { it.second }.last().first
+            .sortedBy { it.second }.lastOrNull()?.first
 
     fun setOppStart(start: List<Move>) {
         you = start

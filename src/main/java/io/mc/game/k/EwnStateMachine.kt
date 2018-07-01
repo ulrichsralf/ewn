@@ -1,15 +1,28 @@
 package io.mc.game.k
 
+import io.mc.game.k.util.generateStartPosition
+import io.mc.game.k.util.getDirection
+import kotlinx.coroutines.experimental.delay
+import kotlinx.coroutines.experimental.runBlocking
 import org.squirrelframework.foundation.fsm.StateMachineBuilderFactory
+import org.squirrelframework.foundation.fsm.StateMachineConfiguration
 import org.squirrelframework.foundation.fsm.annotation.StateMachineParameters
 import org.squirrelframework.foundation.fsm.impl.AbstractUntypedStateMachine
+import java.util.*
 
 
 /**
  * ralf on 6/24/18.
  */
 enum class FSMEvent {
+    CONNECT,
     LOGIN,
+    LISTE,
+    MOVE,
+    WRONG_MOVE,
+    NAME_TAKEN,
+    REJECTED,
+    REQUESTED,
     REQUEST,
     ACCEPT,
     DICE,
@@ -25,55 +38,132 @@ enum class FSMEvent {
         contextType = Map::class)
 class EwnStateMachine : AbstractUntypedStateMachine() {
 
+    val netOut = io.mc.game.k.connection.first
+    val game = Game()
 
-    fun startToLogin(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+    fun connected(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
+        val name = context["name"] as String
+        netOut.send(Login(name))
     }
 
-    fun loggedInToRequestedGame(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+
+    fun loggedIn(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        netOut.send(PlayerList)
     }
 
-    fun loggedInToAccepted(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+    fun liste(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
+        val liste = context["liste"] as List<String>
+        if (liste.isEmpty()) {
+            delay(5000)
+            netOut.send(PlayerList)
+        } else {
+            netOut.send(RequestGame(liste.random()))
+        }
+    }
+
+    fun nameTaken(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        netOut.send(Login(names.random()))
+    }
+
+    fun requestedGame(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        netOut.send(Yes)
+    }
+
+    fun gameRejected(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        delay(5000)
+        netOut.send(PlayerList)
+    }
+
+    fun loggedInToAccepted(from: String, to: String, event: FSMEvent, context: Map<String, String>?) {
+    }
+
+    fun requestedToAccepted(from: String, to: String, event: FSMEvent, context: Map<String, String>?) {
     }
 
     fun acceptedToMeTokenSet(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
     }
 
-    fun requestToSetYouToken(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+    fun acceptedToSetYouToken(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
+        val startToken = context["move"] as List<Move>
+        game.setOppStart(startToken)
+
     }
 
-    fun youTokenSetToPlaying(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+    fun setStartPosition(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
+        val startPosition = generateStartPosition(game.you?.getDirection() == Board.Directon.UP)
+        game.setOwnStart(startPosition)
+        netOut.send(MoveC(startPosition))
     }
 
     fun meTokenSetToPlaying(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
     }
 
-    fun playingToEnd(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+    fun move(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
+        val move = context["move"] as List<Move>
+        game.moveOpp(move.first())
     }
 
-    fun restart(from: String, to: String, event: FSMEvent, context: Map<String, String>) {
-        println("from $from to $to event $event context $context")
+
+    fun dice(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
+        val dice = context["dice"] as Int
+        game.getBestMove(dice)?.let {
+            game.move(it)
+            netOut.send(MoveC(listOf(it)))
+        }
+
+    }
+
+    fun wrongMove(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        netOut.send(PlayerList)
+    }
+
+    fun won(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
+        println("won")
+        netOut.send(PlayerList)
+    }
+
+    fun lost(from: String, to: String, event: FSMEvent, context: Map<String, String>?) {
+        println("lost")
     }
 }
 
 val builder = StateMachineBuilderFactory.create(EwnStateMachine::class.java).apply {
+    StateMachineConfiguration.getInstance().enableDebugMode(true)
     externalTransition()
             .from("STARTED")
+            .to("CONNECTED")
+            .on(FSMEvent.CONNECT)
+            .callMethod("connected")
+    externalTransition()
+            .from("CONNECTED")
+            .to("CONNECTED")
+            .on(FSMEvent.NAME_TAKEN)
+            .callMethod("nameTaken")
+    externalTransition()
+            .from("CONNECTED")
             .to("LOGGED_IN")
             .on(FSMEvent.LOGIN)
-            .callMethod("startToLogin")
+            .callMethod("loggedIn")
+    externalTransition()
+            .from("LOGGED_IN")
+            .to("LOGGED_IN")
+            .on(FSMEvent.LISTE)
+            .callMethod("liste")
+    externalTransition()
+            .from("GAME_REJECTED")
+            .to("LOGGED_IN")
+            .on(FSMEvent.LISTE)
+            .callMethod("liste")
     externalTransition()
             .from("LOGGED_IN")
             .to("GAME_REQUESTED")
-            .on(FSMEvent.REQUEST)
-            .callMethod("loggedInToRequestedGame")
+            .on(FSMEvent.REQUESTED)
+            .callMethod("requestedGame")
+    externalTransition()
+            .from("GAME_REQUESTED")
+            .to("GAME_REJECTED")
+            .on(FSMEvent.REJECTED)
+            .callMethod("gameRejected")
     externalTransition()
             .from("GAME_REQUESTED")
             .to("GAME_ACCEPTED")
@@ -82,13 +172,28 @@ val builder = StateMachineBuilderFactory.create(EwnStateMachine::class.java).app
     externalTransition()
             .from("GAME_ACCEPTED")
             .to("YOU_TOKEN_SET")
-            .on(FSMEvent.DICE)
-            .callMethod("acceptToSetYouToken")
+            .on(FSMEvent.MOVE)
+            .callMethod("acceptedToSetYouToken")
     externalTransition()
             .from("YOU_TOKEN_SET")
             .to("PLAYING")
-            .on(FSMEvent.SET_ME_TOKEN)
-            .callMethod("youTokenSetToPlaying")
+            .on(FSMEvent.DICE)
+            .callMethod("setStartPosition")
+    externalTransition()
+            .from("PLAYING")
+            .to("PLAYING")
+            .on(FSMEvent.MOVE)
+            .callMethod("move")
+    externalTransition()
+            .from("PLAYING")
+            .to("PLAYING")
+            .on(FSMEvent.DICE)
+            .callMethod("dice")
+    externalTransition()
+            .from("PLAYING")
+            .to("LOGGED_IN")
+            .on(FSMEvent.WRONG_MOVE)
+            .callMethod("wrongMove")
     externalTransition()
             .from("LOGGED_IN")
             .to("GAME_ACCEPTED")
@@ -106,29 +211,12 @@ val builder = StateMachineBuilderFactory.create(EwnStateMachine::class.java).app
             .callMethod("meTokenSetToPlaying")
     externalTransition()
             .from("PLAYING")
-            .to("FINISHED")
+            .to("LOGGED_IN")
             .on(FSMEvent.FINISH)
-            .callMethod("playingToEnd")
-    externalTransition()
-            .from("FINISHED")
-            .to("STARTED")
-            .on(FSMEvent.RESTART)
-            .callMethod("restart")
+            .callMethod("won")
 }
 val fsm = builder.newStateMachine("STARTED")
 
 
-
-fun main(args: Array<String>) {
-
-    println(fsm.currentState)
-    fsm.fire(FSMEvent.LOGIN, mapOf("key" to "peter"))
-    fsm.fire(FSMEvent.REQUEST, mapOf("key" to "peter"))
-    fsm.fire(FSMEvent.SET_YOU_TOKEN, mapOf("key" to "peter"))
-    fsm.fire(FSMEvent.SET_ME_TOKEN, mapOf("key" to "peter"))
-    println(fsm.currentState)
-    fsm.fire(FSMEvent.FINISH, mapOf("key" to "peter"))
-    println(fsm.currentState)
-    fsm.fire(FSMEvent.RESTART, mapOf("key" to "peter"))
-    println(fsm.currentState)
-}
+val names = (1..100).map { "Ralf-Bot-$it" }
+fun <T> List<T>.random() = this[Random().nextInt(size)]

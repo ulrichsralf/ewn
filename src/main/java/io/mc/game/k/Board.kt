@@ -17,7 +17,7 @@ class Board(me: List<Move> = generateStartPosition(true),
     enum class Directon { DOWN, UP }
 
     val area: BoardArea = Array(6, { Array(6, { Token() }) })
-    private val upMoveFun = { a: Int -> if (a > 2) a - 1 else a }
+    private val upMoveFun = { a: Int -> if (a > 1) a - 1 else a }
     private val downMoveFun = { a: Int -> if (a < 6) a + 1 else a }
     private val moveFunMap = mutableMapOf<Player, MoveFun>()
 
@@ -78,8 +78,8 @@ class Board(me: List<Move> = generateStartPosition(true),
     fun getAllowedMoves(token: Board.Token): Set<Move> {
         val result = hashSetOf<Move>()
         val moveFun = moveFunMap[token.player]!!
-        val l = (token.w downTo 1).mapNotNull { area.search(token) }.firstOrNull()
-        val r = (token.w..6).mapNotNull { area.search(token) }.firstOrNull()
+        val l = (token.w downTo 1).mapNotNull { area.search(Token(token.player,it)) }.firstOrNull()
+        val r = (token.w..6).mapNotNull { area.search(Token(token.player,it)) }.firstOrNull()
         result.addAll(setOf(l, r).filterNotNull()
                 .map {
                     setOf(Move(it.w, moveFun(it.x), it.y),
@@ -98,6 +98,10 @@ class Board(me: List<Move> = generateStartPosition(true),
 
 data class Move(val w: Int, val x: Int, val y: Int) {
     constructor(move: String) : this(move.substring(0, 1).toInt(), move.substring(1, 2).toInt(), move.substring(2, 3).toInt())
+
+    override fun toString(): String {
+        return "$w$x$y"
+    }
 }
 
 typealias MoveFun = (Int) -> Int

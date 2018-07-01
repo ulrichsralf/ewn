@@ -13,14 +13,16 @@ import java.net.Socket
 import java.util.*
 
 
+val connection = connect("localhost")
+
 fun main(args: Array<String>) {
     runGame()
 }
 
 
 fun runGame(name: String = "ralf") = runBlocking {
-    val g = Game()
-    connect("localhost").let { (netOut, netIn) ->
+
+    connection.let { (netOut, netIn) ->
         Runtime.getRuntime().addShutdownHook(Thread {
             launch { netOut.send(Logout) }
             Thread.sleep(200)
@@ -31,72 +33,41 @@ fun runGame(name: String = "ralf") = runBlocking {
                     .forEach { netOut.send(ConsoleCommand(it)) }
         }
         launch {
-
             for (msg in netIn) {
                 msg.parseMessage().let {
-                    println(it)
+                    println(fsm.currentState)
                     when (msg.parseResponseCode()) {
                         R.Success -> when {
-                            it.isConnected() -> netOut.send(Login(name))
-                            it.isLoggedIn() ->{
-                                netOut.send(PlayerList)
-                                fsm.fire(FSMEvent.LOGIN, mapOf("name" to name))
-                            }
-                            it.isListe() -> {
-                                println(it.getPlayerListe())
-                            }
+                            it.isConnected() -> fsm.fire(FSMEvent.CONNECT, mapOf("name" to names.random()))
+                            it.isLoggedIn() -> fsm.fire(FSMEvent.LOGIN)
+                            it.isAccepted() -> fsm.fire(FSMEvent.ACCEPT)
+                            it.isListe() -> fsm.fire(FSMEvent.LISTE, mapOf("liste" to it.getPlayerListe()))
                             else -> Unit
                         }
                         R.Message -> when {
-                            it.isStart() -> g.reset()
-                            it.isEnd() -> {
-                                fsm.fire(FSMEvent.FINISH, mapOf("key" to "peter"))
-                                println("Endstand: ")
-                                println(g.board)
-                            }
+                            it.isStart() -> fsm.fire(FSMEvent.RESTART)
+                            it.isEnd() -> fsm.fire(FSMEvent.FINISH)
+                            it.isRequested() -> fsm.fire(FSMEvent.REQUESTED)
                             else -> Unit
                         }
+                        R.GameRequestRejected -> fsm.fire(FSMEvent.REJECTED)
+                        R.NameConflict -> fsm.fire(FSMEvent.NAME_TAKEN)
                         R.Move -> when {
-                            it.isDice() -> {
-                                fsm.fire(FSMEvent.DICE, mapOf("dice" to it.parseDice()))
-                                when (g.state) {
-                                    GameState.READY -> {
-                                        g.setOwnStart(generateStartPosition(false))
-                                       netOut.send(MoveC(g.me!!))
-                                        g.state = GameState.RUNNING
-                                    }
-                                    GameState.RUNNING -> {
-                                        val m = g.getBestMove(it.parseDice())
-                                        println(m)
-                                        g.move(m)
-                                        Thread.sleep(3000)
-                                        netOut.send(MoveC(listOf(m)))
-                                        println(g.board)
-                                    }
-                                    else -> Unit
+                            it.isDice() -> fsm.fire(FSMEvent.DICE, mapOf("dice" to it.parseDice()))
+                            it.isMove() -> {
+                                if (it.message == "E01") {
+                                    fsm.fire(FSMEvent.WRONG_MOVE)
+                                } else {
+                                    fsm.fire(FSMEvent.MOVE, mapOf("move" to it.parseMoves()))
                                 }
                             }
-                            it.isMove() ->  fsm.fire(FSMEvent.DICE, mapOf("move" to it.parseMoves()))
-
-
-                            it.setStart() -> {
-                                val start = generateStartPosition(true)
-                                fsm.fire(FSMEvent.SET_ME_TOKEN, mapOf("set" to start))
-                                g.setOwnStart(start)
-                                netOut.send(MoveC(start))
-                            }
+                            it.setStart() -> fsm.fire(FSMEvent.SET_ME_TOKEN)
                             else -> Unit
                         }
                         else -> Unit
                     }
                 }
                 println(msg)
-                if (g.state == GameState.RUNNING && g.isFinished()) {
-                    println("Won Game")
-                    println(g.board)
-                    g.state = GameState.FINISHED
-                    netOut.send(Quit)
-                }
             }
         }
         cl.join()
@@ -128,3 +99,4 @@ fun connect(hostname: String): Pair<SendChannel<C>, ReceiveChannel<String>> {
         netOut to netIn as ReceiveChannel<String>
     }
 }
+
