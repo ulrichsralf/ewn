@@ -54,7 +54,7 @@ class EwnStateMachine : AbstractUntypedStateMachine() {
     fun liste(from: String, to: String, event: FSMEvent, context: Map<String, String>) = runBlocking {
         val liste = context["liste"] as List<String>
         if (liste.isEmpty()) {
-            delay(5000)
+            delay(15000)
             netOut.send(PlayerList)
         } else {
             netOut.send(RequestGame(liste.random()))
@@ -70,7 +70,7 @@ class EwnStateMachine : AbstractUntypedStateMachine() {
     }
 
     fun gameRejected(from: String, to: String, event: FSMEvent, context: Map<String, String>?) = runBlocking {
-        delay(5000)
+        delay(15000)
         netOut.send(PlayerList)
     }
 
